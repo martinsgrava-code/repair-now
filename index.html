@@ -86,6 +86,13 @@
             font-weight: 800;
             font-size: 0.75rem;
         }
+        
+        .multiplier-text {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -106,11 +113,11 @@
                 </label>
                 <div class="input-row">
                     <div class="input-group" style="flex:1">
-                        <label>Comm. Year <span class="help-tip" title="The year the turbine was commissioned. If set, historical erosion is calculated up to the current year.">(?)</span></label>
+                        <label>Comm. Year</label>
                         <input type="number" id="commYear" value="2015" disabled oninput="runSimulation(true)">
                     </div>
                     <div class="input-group" style="flex:1">
-                        <label>Current CAT <span class="help-tip" title="The observed condition of the blade today. The projection will correct to this state and continue forward.">(?)</span></label>
+                        <label>Current CAT</label>
                         <select id="currentCat" disabled onchange="runSimulation(true)">
                             <option value="1">CAT1</option>
                             <option value="2">CAT2</option>
@@ -122,19 +129,24 @@
                 </div>
                 <div class="input-row">
                     <div class="input-group" style="flex:1">
-                        <label>Initial LEP <span class="help-tip" title="The protective coating applied at the factory or during commissioning.">(?)</span></label>
-                        <select id="initialMaterial" onchange="runSimulation(true)"></select>
+                        <label>Initial LEP <span class="help-tip" title="The protective coating applied at the factory. Its threshold is used as the baseline multiplier for repairs.">(?)</span></label>
+                        <select id="initialMaterial" onchange="renderInputs(); runSimulation(true)"></select>
                     </div>
                     <div class="input-group" style="flex:1">
-                        <label>Erosion Class <span class="help-tip" title="Severity of the environment. Determines the base annual hours of erosion the turbine experiences.">(?)</span></label>
-                        <select id="severity" onchange="runSimulation(true)">
-                            <option value="veryLow">Very Low</option>
-                            <option value="low">Low</option>
+                        <label>Site Degradation <span class="help-tip" title="Empirical speed of erosion. Determines the shape of the damage curve.">(?)</span></label>
+                        <select id="degProfile" onchange="changeProfile()">
                             <option value="medium" selected>Medium</option>
-                            <option value="high">High</option>
-                            <option value="severe">Severe</option>
+                            <option value="fast">Fast</option>
+                            <option value="slow">Slow</option>
+                            <option value="custom">Custom</option>
                         </select>
                     </div>
+                </div>
+                <div class="input-row" id="customYearsRow">
+                    <div class="input-group" style="flex:1"><label>To CAT2</label><input type="number" step="0.1" id="y_cat2" value="4.1" oninput="document.getElementById('degProfile').value='custom'; runSimulation(true)"></div>
+                    <div class="input-group" style="flex:1"><label>To CAT3</label><input type="number" step="0.1" id="y_cat3" value="7.0" oninput="document.getElementById('degProfile').value='custom'; runSimulation(true)"></div>
+                    <div class="input-group" style="flex:1"><label>To CAT4</label><input type="number" step="0.1" id="y_cat4" value="9.1" oninput="document.getElementById('degProfile').value='custom'; runSimulation(true)"></div>
+                    <div class="input-group" style="flex:1"><label>To CAT5</label><input type="number" step="0.1" id="y_cat5" value="10.5" oninput="document.getElementById('degProfile').value='custom'; runSimulation(true)"></div>
                 </div>
                 <div class="input-row">
                     <div class="input-group" style="flex:1"><label>WTGs</label><input type="number" id="wtgCount" value="1" oninput="runSimulation(true)"></div>
@@ -145,8 +157,7 @@
                     <div class="input-group" style="flex:1"><label>Price ($)</label><input type="number" id="elecPrice" value="75" oninput="runSimulation(true)"></div>
                 </div>
                 <div class="input-row">
-                    <div class="input-group" style="flex:1"><label>Proj. Yrs <span class="help-tip" title="How many years into the future to project the financial model.">(?)</span></label><input type="number" id="period" value="15" oninput="runSimulation(true)"></div>
-                    <div class="input-group" style="flex:1"><label>Tip Speed (m/s) <span class="help-tip" title="Erosion is modeled non-linearly with blade tip speed (power of 5). Higher speeds consume the material endurance drastically faster.">(?)</span></label><input type="number" id="tipSpeed" value="85" oninput="runSimulation(true)"></div>
+                    <div class="input-group" style="flex:1"><label>Proj. Yrs</label><input type="number" id="period" value="15" oninput="runSimulation(true)"></div>
                 </div>
             </div>
 
@@ -164,11 +175,11 @@
 
             <div class="chart-grid">
                 <div class="card">
-                    <h3>Erosion Category Progression <span class="help-tip" title="How the blade condition degrades over time from CAT1 to CAT5. Drops back to CAT1 after a repair event.">(?)</span></h3>
+                    <h3>Erosion Category Progression</h3>
                     <div class="chart-box"><canvas id="progressionChart"></canvas></div>
                 </div>
                 <div class="card">
-                    <h3>Future AEP loss + repair costs <span class="help-tip" title="Cumulative financial sum of energy production lost to aerodynamic drag, energy lost during downtime, and physical repair costs.">(?)</span></h3>
+                    <h3>Future AEP loss + repair costs</h3>
                     <div class="chart-box"><canvas id="financialChart"></canvas></div>
                 </div>
             </div>
@@ -181,13 +192,13 @@
                         <thead>
                             <tr>
                                 <th>Year</th>
-                                <th>Condition <span class="help-tip" title="Category at the end of the year.">(?)</span></th>
-                                <th>Event <span class="help-tip" title="Repair is applied halfway through the year when the trigger category is reached.">(?)</span></th>
+                                <th>Peak Damage <span class="help-tip" title="Highest continuous fractional category reached that year. Capped at 5.0.">(?)</span></th>
+                                <th>Event</th>
                                 <th>Active LEP</th>
-                                <th>AEP Loss % <span class="help-tip" title="If repaired this year, this is a 50/50 blend of the damaged loss % and the clean CAT1 loss %.">(?)</span></th>
+                                <th>AEP Loss % <span class="help-tip" title="Interpolated perfectly between whole CAT values based on current degradation.">(?)</span></th>
+                                <th>AEP Loss ($)</th>
                                 <th>Repair Costs</th>
-                                <th>Cumul. AEP loss + repair costs <span class="help-tip" title="Total accumulated costs and losses from the current year to the end of the projection.">(?)</span></th>
-                                <th>Cumul. Net (Future)</th>
+                                <th>Cumul. AEP loss + repair costs</th>
                             </tr>
                         </thead>
                         <tbody id="breakdownBody"></tbody>
@@ -205,12 +216,11 @@
             <button onclick="closeSettings()" style="background:none; border:none; font-size:16px; font-weight:bold; cursor:pointer;">[Close]</button>
         </div>
         <div class="settings-section">
-            <h3>Severity Hours & Loss %</h3>
-            <div class="settings-grid-4" id="sevInputs"></div>
-            <div class="settings-grid-4" id="lossInputs" style="margin-top:10px"></div>
+            <h3>AEP Loss % (Whole Categories)</h3>
+            <div class="settings-grid-4" id="lossInputs"></div>
         </div>
         <div class="settings-section">
-            <h3>Material Thresholds (Exposure hours)</h3>
+            <h3>Material Strength Thresholds (Used to calculate multiplier vs Baseline)</h3>
             <div class="settings-grid-4" id="matInputs"></div>
         </div>
         <div class="settings-section">
@@ -224,30 +234,94 @@
 <script>
     const CURRENT_YEAR = new Date().getFullYear(); 
     
+    // Smooth Polynomial Math Engine
+    const PRESETS = {
+        fast: [1.8, 3.0, 3.9, 4.5],
+        medium: [4.1, 7.0, 9.1, 10.5],
+        slow: [8.8, 15.0, 19.4, 22.5]
+    };
+
+    function changeProfile() {
+        const profile = document.getElementById('degProfile').value;
+        if (profile !== 'custom') {
+            const inputs = [
+                document.getElementById('y_cat2'),
+                document.getElementById('y_cat3'),
+                document.getElementById('y_cat4'),
+                document.getElementById('y_cat5')
+            ];
+            inputs.forEach((input, idx) => {
+                input.value = PRESETS[profile][idx];
+            });
+        }
+        runSimulation(true);
+    }
+
+    // Matrix Solver for Polynomial Curve (a, b, c, d)
+    function getPolynomialCoeffs(yVals) {
+        let A = [], B = [];
+        for(let i=1; i<=4; i++) {
+            A.push([Math.pow(i,4), Math.pow(i,3), Math.pow(i,2), i]);
+            B.push(yVals[i-1]);
+        }
+        let n = 4;
+        for (let i = 0; i < n; i++) {
+            let maxEl = Math.abs(A[i][i]), maxRow = i;
+            for (let k = i + 1; k < n; k++) {
+                if (Math.abs(A[k][i]) > maxEl) { maxEl = Math.abs(A[k][i]); maxRow = k; }
+            }
+            let tmp = A[maxRow]; A[maxRow] = A[i]; A[i] = tmp;
+            let tmpB = B[maxRow]; B[maxRow] = B[i]; B[i] = tmpB;
+
+            for (let k = i + 1; k < n; k++) {
+                let c = -A[k][i] / A[i][i];
+                for (let j = i; j < n; j++) {
+                    if (i === j) A[k][j] = 0;
+                    else A[k][j] += c * A[i][j];
+                }
+                B[k] += c * B[i];
+            }
+        }
+        let x = new Array(n).fill(0);
+        for (let i = n - 1; i >= 0; i--) {
+            x[i] = B[i] / A[i][i];
+            for (let k = i - 1; k >= 0; k--) { B[k] -= A[k][i] * x[i]; }
+        }
+        return x; 
+    }
+
+    // Bisection search to find exact continuous CAT from Year
+    function getCatForYear(targetYear, coeffs, yVals) {
+        if (targetYear <= 0) return 1.0;
+        if (targetYear > yVals[3]) {
+            let slope = (yVals[3] - yVals[2]); 
+            return 5.0 + ((targetYear - yVals[3]) / slope);
+        }
+        let [a, b, c, d] = coeffs;
+        let low = 0, high = 4, mid;
+        for(let i=0; i<40; i++) {
+            mid = (low + high) / 2;
+            let y = a*Math.pow(mid, 4) + b*Math.pow(mid, 3) + c*Math.pow(mid, 2) + d*mid;
+            if (y < targetYear) low = mid;
+            else high = mid;
+        }
+        return mid + 1.0; 
+    }
+
+    // Chart Plugin for "Today" line
     const todayLinePlugin = {
         id: 'todayLine',
         afterDraw: (chart) => {
             if (chart.config.options.plugins && chart.config.options.plugins.todayLine) {
-                const ctx = chart.ctx;
-                const xAxis = chart.scales.x;
-                const yAxis = chart.scales.y;
+                const ctx = chart.ctx, xAxis = chart.scales.x, yAxis = chart.scales.y;
                 const xValue = chart.config.options.plugins.todayLine.year;
-                
                 const index = chart.data.labels.indexOf(xValue);
                 if(index !== -1) {
                     const x = xAxis.getPixelForTick(index);
                     ctx.save();
-                    ctx.beginPath();
-                    ctx.moveTo(x, yAxis.top);
-                    ctx.lineTo(x, yAxis.bottom);
-                    ctx.lineWidth = 2;
-                    ctx.strokeStyle = 'red';
-                    ctx.setLineDash([5, 5]);
-                    ctx.stroke();
-                    
-                    ctx.fillStyle = 'red';
-                    ctx.textAlign = 'center';
-                    ctx.font = 'bold 11px sans-serif';
+                    ctx.beginPath(); ctx.moveTo(x, yAxis.top); ctx.lineTo(x, yAxis.bottom);
+                    ctx.lineWidth = 2; ctx.strokeStyle = 'red'; ctx.setLineDash([5, 5]); ctx.stroke();
+                    ctx.fillStyle = 'red'; ctx.textAlign = 'center'; ctx.font = 'bold 11px sans-serif';
                     ctx.fillText('Current Year', x, yAxis.top - 8);
                     ctx.restore();
                 }
@@ -256,10 +330,9 @@
     };
     Chart.register(todayLinePlugin);
 
-    let SEVERITY_HOURS = { veryLow: 0.5, low: 2.5, medium: 5.0, high: 8.5, severe: 12.0 };
     let MATERIALS = [
         { id: 'factory', name: 'Factory Stock', threshold: 6.0 },
-        { id: 'hontek_2', name: 'Hontek S-110 (2 layer)', threshold: 200 },
+        { id: 'hontek_2', name: 'Hontek S-110 (2 layer)', threshold: 100.0 },
         { id: 'hontek_1', name: 'Hontek S-110 (1 layer)', threshold: 55.33 },
         { id: 'polytech', name: 'Polytech ELLE (tape)', threshold: 38.08 },
         { id: 'sika', name: 'SikaForce 860L02', threshold: 16.88 },
@@ -269,7 +342,16 @@
     ];
     let AEP_LOSS_MAP = { 1: 0.44, 2: 0.87, 3: 1.57, 4: 2.45, 5: 3.32 };
     
-    // KPI is now per WTG (scaled x3 from the previous per-blade defaults)
+    function getInterpolatedAepLoss(cat) {
+        if (cat <= 1) return AEP_LOSS_MAP[1];
+        if (cat >= 5) return AEP_LOSS_MAP[5];
+        let lower = Math.floor(cat);
+        let upper = Math.ceil(cat);
+        if (lower === upper) return AEP_LOSS_MAP[lower];
+        let fraction = cat - lower;
+        return AEP_LOSS_MAP[lower] + fraction * (AEP_LOSS_MAP[upper] - AEP_LOSS_MAP[lower]);
+    }
+
     let REPAIR_ECONOMICS = {
         2: { serviceWTG: 20250, materialWTG: 3000, ratWTG: 0, kpiDaysWTG: 1.5 },
         3: { serviceWTG: 22500, materialWTG: 3900, ratWTG: 0, kpiDaysWTG: 3.0 },
@@ -295,8 +377,7 @@
 
     function toggleScenarioVisibility(idx) {
         scenarios[idx].visible = !scenarios[idx].visible;
-        renderInputs();
-        runSimulation(true);
+        renderInputs(); runSimulation(true);
     }
 
     function runSimulation(updateCharts = true) {
@@ -306,105 +387,98 @@
         const baseYear = commYear || CURRENT_YEAR;
         
         const initialMatId = document.getElementById('initialMaterial').value;
-        const initialMat = MATERIALS.find(m => m.id === initialMatId);
-        const sevClass = document.getElementById('severity').value;
+        const initialMat = MATERIALS.find(m => m.id === initialMatId) || MATERIALS[0];
+        
+        const yVals = [
+            parseFloat(document.getElementById('y_cat2').value),
+            parseFloat(document.getElementById('y_cat3').value),
+            parseFloat(document.getElementById('y_cat4').value),
+            parseFloat(document.getElementById('y_cat5').value)
+        ];
+        const coeffs = getPolynomialCoeffs(yVals);
+
         const wtgCount = parseFloat(document.getElementById('wtgCount').value) || 1;
         const powerMW = parseFloat(document.getElementById('powerMW').value) || 3;
         const capFactor = (parseFloat(document.getElementById('capFactor').value) || 35) / 100;
         const elecPrice = parseFloat(document.getElementById('elecPrice').value) || 75;
         const period = parseInt(document.getElementById('period').value) || 15;
-        const tipSpeed = parseFloat(document.getElementById('tipSpeed').value) || 85;
-        
-        const speedMult = Math.pow(tipSpeed / 100, 5);
-        const effLoad = SEVERITY_HOURS[sevClass] * speedMult;
         const annualGross = powerMW * 8760 * capFactor * wtgCount * elecPrice;
 
         let totalYears = period;
-        if (baseYear < CURRENT_YEAR) {
-            totalYears = (CURRENT_YEAR - baseYear) + period;
-        }
+        if (baseYear < CURRENT_YEAR) totalYears = (CURRENT_YEAR - baseYear) + period;
 
         cachedResults = scenarios.map(s => {
             const repairMat = MATERIALS.find(m => m.id === s.material);
-            const getStages = (m) => {
-                const t12 = m.threshold / effLoad;
-                return { 12: t12, 23: t12 * 0.7, 34: t12 * 0.5, 45: t12 * 0.35 };
-            };
-
-            let stages = getStages(initialMat);
             let yearlyData = [];
             let currentCat = 1.0, currentAge = 0;
-            let cumulativeImpact = 0, cumulativeGross = 0, cumulativeAepL = 0;
+            let currentMultiplier = 1.0; 
+            let cumulativeImpact = 0, repairCount = 0;
 
             for (let i = 0; i <= totalYears; i++) {
                 const yearNum = baseYear + i;
                 
                 if (commActive && yearNum === CURRENT_YEAR && forcedCurrentCat) {
                     currentCat = forcedCurrentCat;
-                    currentAge = 0; 
+                    currentAge = (coeffs[0]*Math.pow(currentCat-1,4) + coeffs[1]*Math.pow(currentCat-1,3) + coeffs[2]*Math.pow(currentCat-1,2) + coeffs[3]*(currentCat-1)) * currentMultiplier;
                 }
 
-                let startCat = Math.floor(currentCat);
                 let currentMatName = (i === 0 || yearlyData[i-1].repairTriggered) ? (i === 0 ? initialMat.name : repairMat.name) : yearlyData[i-1].materialName;
-
                 let triggered = false;
                 
                 currentAge += 1;
-                let thresh = startCat < 5 ? stages[startCat + "" + (startCat+1)] : 999;
-                if (currentAge >= thresh && startCat < 5) { currentCat += 1; currentAge = 0; }
+                currentCat = getCatForYear(currentAge / currentMultiplier, coeffs, yVals);
                 
-                let endCat = Math.floor(currentCat);
+                let preRepairCat = currentCat; // Save state of the peak damage before repair happens
                 
-                if (endCat >= s.trigger) {
+                if (currentCat >= s.trigger) {
                     triggered = true;
                 }
 
-                let aepL = 0, repC = 0, downL = 0;
+                let aepLossPct = 0, aepL = 0, repC = 0, downL = 0;
 
                 if (triggered) {
-                    const blended = ((AEP_LOSS_MAP[endCat]/100) + (AEP_LOSS_MAP[1]/100)) / 2;
-                    aepL = annualGross * blended;
-                    const econ = REPAIR_ECONOMICS[endCat];
-                    repC = (econ.serviceWTG + econ.materialWTG + econ.ratWTG) * wtgCount;
-                    downL = annualGross * (econ.kpiDaysWTG / 365); // Downtime calculated per WTG
+                    aepLossPct = (getInterpolatedAepLoss(preRepairCat) + getInterpolatedAepLoss(1)) / 2;
+                    aepL = annualGross * (aepLossPct/100);
                     
-                    stages = getStages(repairMat); 
-                    currentCat = 1; 
+                    const triggerInt = Math.floor(preRepairCat) > 5 ? 5 : Math.floor(preRepairCat);
+                    const econ = REPAIR_ECONOMICS[triggerInt];
+                    repC = (econ.serviceWTG + econ.materialWTG + econ.ratWTG) * wtgCount;
+                    downL = annualGross * (econ.kpiDaysWTG / 365);
+                    
+                    currentCat = 1.0; 
                     currentAge = 0.5; 
+                    currentMultiplier = repairMat.threshold / initialMat.threshold;
+                    if (yearNum >= CURRENT_YEAR) repairCount++;
                 } else {
-                    aepL = annualGross * (AEP_LOSS_MAP[endCat] / 100);
+                    aepLossPct = getInterpolatedAepLoss(currentCat);
+                    aepL = annualGross * (aepLossPct / 100);
                 }
 
-                if (yearNum >= CURRENT_YEAR) {
-                    cumulativeImpact += (aepL + repC + downL);
-                    cumulativeGross += annualGross;
-                    cumulativeAepL += aepL;
-                }
+                // If a repair triggers, we chart/display the Peak Damage so you actually see it hit CAT 5.0
+                let displayCat = triggered ? Math.min(preRepairCat, 5.0) : Math.min(currentCat, 5.0);
+
+                if (yearNum >= CURRENT_YEAR) cumulativeImpact += (aepL + repC + downL);
 
                 yearlyData.push({ 
-                    year: yearNum, endCat, repairTriggered: triggered, materialName: currentMatName, 
-                    aepLossPct: triggered ? ((AEP_LOSS_MAP[endCat] + AEP_LOSS_MAP[1])/2) : AEP_LOSS_MAP[endCat],
-                    repCost: repC, impact: aepL + repC + downL, 
-                    cumulativeImpact: yearNum >= CURRENT_YEAR ? cumulativeImpact : 0,
-                    cumulativeAepL: yearNum >= CURRENT_YEAR ? cumulativeAepL : 0,
-                    net: yearNum >= CURRENT_YEAR ? (cumulativeGross - cumulativeImpact) : 0
+                    year: yearNum, endCat: displayCat, repairTriggered: triggered, materialName: currentMatName, 
+                    aepLossPct: aepLossPct, aepLossUsd: aepL, repCost: repC, 
+                    impact: aepL + repC + downL, cumulativeImpact: yearNum >= CURRENT_YEAR ? cumulativeImpact : 0
                 });
             }
-            return { ...s, yearlyData, totalImpact: cumulativeImpact, totalNet: yearlyData[yearlyData.length-1].net };
+            return { ...s, yearlyData, totalImpact: cumulativeImpact, repairCount };
         });
-
         renderUI(updateCharts);
     }
 
     function renderUI(updateCharts) {
         const visibleResults = cachedResults.filter(r => r.visible);
-        const sorted = [...visibleResults].sort((a, b) => b.totalNet - a.totalNet);
+        const sorted = [...visibleResults].sort((a, b) => a.totalImpact - b.totalImpact);
         const best = sorted[0];
 
         if (best) {
             document.getElementById('bannerTitle').innerText = `Best Strategy: ${best.name}`;
-            const netFormatted = `$${(best.totalNet / 1000000).toFixed(2)}M`;
-            document.getElementById('bannerDesc').innerText = `Future Net Result from ${CURRENT_YEAR}: ${netFormatted}.`;
+            const impactFormatted = `$${(best.totalImpact / 1000000).toFixed(2)}M`;
+            document.getElementById('bannerDesc').innerText = `Total Future Impact from ${CURRENT_YEAR}: ${impactFormatted} (${best.repairCount} Repairs).`;
         } else {
             document.getElementById('bannerTitle').innerText = `No Active Scenarios`;
             document.getElementById('bannerDesc').innerText = `Please toggle on at least one scenario.`;
@@ -414,11 +488,8 @@
             <div class="card scenario-card" style="border-left-color:${r.color}">
                 <strong>Rank ${i+1}: ${r.name}</strong>
                 <div style="margin-top:10px; display:grid; grid-template-columns:1fr 1fr; gap:5px;">
-                    <div><label>Future Net</label><span class="stat-val">$${(r.totalNet / 1e6).toFixed(2)}M</span></div>
-                    <div>
-                        <label>Future AEP loss + repair costs</label>
-                        <span class="stat-val">$${(r.totalImpact / 1e6).toFixed(2)}M</span>
-                    </div>
+                    <div><label>Repair Count</label><span class="stat-val">${r.repairCount}</span></div>
+                    <div><label>Future Impact Cost</label><span class="stat-val">$${(r.totalImpact / 1e6).toFixed(2)}M</span></div>
                 </div>
             </div>`).join('');
 
@@ -435,25 +506,7 @@
             const hasCurrentYear = results[0].yearlyData.filter(y => y.year >= CURRENT_YEAR).some(y => y.year === CURRENT_YEAR);
             if (hasCurrentYear) {
                 annotationConfig = {
-                    annotations: {
-                        todayLine: {
-                            type: 'line',
-                            scaleID: 'x',
-                            value: CURRENT_YEAR,
-                            borderColor: 'rgba(239, 68, 68, 0.8)',
-                            borderWidth: 2,
-                            borderDash: [5, 5],
-                            label: {
-                                content: 'Current Year (' + CURRENT_YEAR + ')',
-                                display: true,
-                                position: 'start',
-                                backgroundColor: 'rgba(239, 68, 68, 0.9)',
-                                color: 'white',
-                                padding: 4,
-                                font: { size: 10, weight: 'bold' }
-                            }
-                        }
-                    }
+                    annotations: { todayLine: { type: 'line', scaleID: 'x', value: CURRENT_YEAR, borderColor: 'rgba(239, 68, 68, 0.8)', borderWidth: 2, borderDash: [5, 5], label: { content: 'Current Year', display: true, position: 'start', backgroundColor: 'rgba(239, 68, 68, 0.9)', color: 'white', padding: 4, font: { size: 10, weight: 'bold' } } } }
                 };
             }
         }
@@ -462,15 +515,15 @@
             type: 'line', 
             data: {
                 labels: results.length > 0 ? results[0].yearlyData.filter(y => y.year >= CURRENT_YEAR).map(y => y.year) : [],
-                datasets: results.map(r => ({ label: r.name, data: r.yearlyData.filter(y => y.year >= CURRENT_YEAR).map(y => y.endCat), borderColor: r.color, stepped: true, tension: 0 }))
+                datasets: results.map(r => ({ label: r.name, data: r.yearlyData.filter(y => y.year >= CURRENT_YEAR).map(y => y.endCat), borderColor: r.color, tension: 0.2 })) 
             },
             options: {
                 responsive: true, maintainAspectRatio: false,
-                scales: { y: { min: 1, max: 5, ticks: { stepSize: 1 } } },
-                plugins: {
-                    annotation: annotationConfig,
-                    legend: { position: 'top' }
-                }
+                scales: { 
+                    x: { title: { display: true, text: 'Year', font: { weight: 'bold' } } },
+                    y: { min: 1, max: 5.2, title: { display: true, text: 'Erosion Category', font: { weight: 'bold' } } } 
+                },
+                plugins: { annotation: annotationConfig, legend: { position: 'top' } }
             }
         });
 
@@ -480,9 +533,16 @@
             type: 'line', 
             data: {
                 labels: results.length > 0 ? results[0].yearlyData.filter(y => y.year >= CURRENT_YEAR).map(y => y.year) : [],
-                datasets: results.map(r => ({ label: r.name, data: r.yearlyData.filter(y => y.year >= CURRENT_YEAR).map(y => y.cumulativeImpact), borderColor: r.color, tension: 0.1 }))
+                datasets: results.map(r => ({ label: r.name, data: r.yearlyData.filter(y => y.year >= CURRENT_YEAR).map(y => y.cumulativeImpact), borderColor: r.color, tension: 0.2 }))
             },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { tooltip: { callbacks: { label: (c) => `$${Math.round(c.parsed.y).toLocaleString()}` } } } }
+            options: { 
+                responsive: true, maintainAspectRatio: false, 
+                scales: {
+                    x: { title: { display: true, text: 'Year', font: { weight: 'bold' } } },
+                    y: { title: { display: true, text: 'Cumulative Cost ($)', font: { weight: 'bold' } } }
+                },
+                plugins: { tooltip: { callbacks: { label: (c) => `$${Math.round(c.parsed.y).toLocaleString()}` } } } 
+            }
         });
     }
 
@@ -496,17 +556,25 @@
             return;
         }
 
-        document.getElementById('breakdownBody').innerHTML = target.yearlyData.filter(y => y.year >= CURRENT_YEAR).map(y => `
+        document.getElementById('breakdownBody').innerHTML = target.yearlyData.filter(y => y.year >= CURRENT_YEAR).map(y => {
+            // Dynamic formatting function for million+ numbers
+            const formatCumul = (val) => {
+                if (val >= 1000000) return '$' + (val / 1e6).toFixed(2) + 'M';
+                return '$' + Math.round(val / 1e3).toLocaleString() + 'k';
+            };
+            
+            return `
             <tr style="${y.year === CURRENT_YEAR ? 'background:#fff7ed; outline: 1px solid orange' : ''}">
                 <td>${y.year} ${y.year === CURRENT_YEAR ? '<strong>(TODAY)</strong>' : ''}</td>
-                <td><span class="cat-badge cat-${y.endCat}">CAT ${y.endCat}</span></td>
+                <td><span class="cat-badge cat-${Math.floor(y.endCat) > 5 ? 5 : Math.floor(y.endCat)}">CAT ${y.endCat.toFixed(2)}</span></td>
                 <td>${y.repairTriggered ? '[Repair Event]' : '-'}</td>
                 <td>${y.materialName}</td>
                 <td>${y.aepLossPct.toFixed(2)}%</td>
+                <td>${y.year >= CURRENT_YEAR ? '$'+Math.round(y.aepLossUsd).toLocaleString() : '-'}</td>
                 <td>${y.year >= CURRENT_YEAR ? '$'+Math.round(y.repCost).toLocaleString() : '-'}</td>
-                <td>${y.year >= CURRENT_YEAR ? '$'+Math.round(y.cumulativeImpact/1e3).toLocaleString()+'k' : '-'}</td>
-                <td>${y.year >= CURRENT_YEAR ? '<strong>$'+(y.net/1e6).toFixed(2)+'M</strong>' : '-'}</td>
-            </tr>`).join('');
+                <td>${y.year >= CURRENT_YEAR ? formatCumul(y.cumulativeImpact) : '-'}</td>
+            </tr>`;
+        }).join('');
     }
 
     function handleScenarioUpdate(idx, field, value) {
@@ -517,40 +585,57 @@
                 scenarios[idx].name = `Repair at CAT ${scenarios[idx].trigger} (${matName})`;
             }
         } else if (field === 'name') {
-            scenarios[idx].autoName = false; // User manually updated the name, turn off auto-naming
+            scenarios[idx].autoName = false; 
         }
         runSimulation(true);
     }
 
     function renderInputs() {
-        document.getElementById('scenarioInputs').innerHTML = scenarios.map((s, idx) => `
+        const initialMatId = document.getElementById('initialMaterial')?.value;
+        const initialMat = MATERIALS.find(m => m.id === initialMatId) || MATERIALS[0]; 
+
+        document.getElementById('scenarioInputs').innerHTML = scenarios.map((s, idx) => {
+            const repMat = MATERIALS.find(m => m.id === s.material);
+            const ratio = repMat.threshold / initialMat.threshold;
+            
+            let compText = "";
+            if (ratio > 1) {
+                compText = `${ratio.toFixed(1)}x better vs Initial`;
+            } else if (ratio < 1) {
+                compText = `${(1/ratio).toFixed(1)}x worse vs Initial`;
+            } else {
+                compText = `Same as Initial`;
+            }
+
+            return `
             <div class="card scenario-card ${!s.visible ? 'hidden-scenario' : ''}" style="border-left-color:${s.color}">
                 <button class="remove-btn" onclick="scenarios.splice(${idx},1);renderInputs();runSimulation(true);" title="Remove Scenario">X</button>
                 <input type="text" value="${s.name}" onchange="handleScenarioUpdate(${idx}, 'name', this.value); renderInputs();" style="border:none; font-weight:bold; width:80%; outline:none; background:transparent;">
                 <div class="input-row">
                     <div class="input-group" style="flex:1">
-                        <label>Trigger <span class="help-tip" title="Erosion category at which the repair occurs.">(?)</span></label>
+                        <label>Trigger</label>
                         <select onchange="handleScenarioUpdate(${idx}, 'trigger', this.value); renderInputs();">
                             ${[2,3,4,5].map(v=>`<option value="${v}" ${s.trigger==v?'selected':''}>CAT${v}</option>`).join('')}
                         </select>
                     </div>
                     <div class="input-group" style="flex:1">
-                        <label>Rep. LEP <span class="help-tip" title="The material applied during the repair, which dictates future durability.">(?)</span></label>
+                        <label>Rep. LEP</label>
                         <select onchange="handleScenarioUpdate(${idx}, 'material', this.value); renderInputs();">
                             ${MATERIALS.map(m=>`<option value="${m.id}" ${s.material==m.id?'selected':''}>${m.name}</option>`).join('')}
                         </select>
+                        <div class="multiplier-text">↳ ${compText}</div>
                     </div>
                 </div>
                 <div class="card-actions">
                     <button class="action-btn" onclick="toggleScenarioVisibility(${idx})">${s.visible ? 'Hide Scenario' : 'Show Scenario'}</button>
                 </div>
-            </div>`).join('');
+            </div>`;
+        }).join('');
     }
 
     function openSettings() {
-        document.getElementById('sevInputs').innerHTML = Object.keys(SEVERITY_HOURS).map(k => `<div class="input-group"><label>${k} Hrs</label><input type="number" id="s_${k}" value="${SEVERITY_HOURS[k]}"></div>`).join('');
-        document.getElementById('lossInputs').innerHTML = [1,2,3,4,5].map(c => `<div class="input-group"><label>CAT${c} Loss%</label><input type="number" id="l_${c}" value="${AEP_LOSS_MAP[c]}"></div>`).join('');
-        document.getElementById('matInputs').innerHTML = MATERIALS.map(m => `<div class="input-group"><label>${m.name}</label><input type="number" id="m_${m.id}" value="${m.threshold}"></div>`).join('');
+        document.getElementById('lossInputs').innerHTML = [1,2,3,4,5].map(c => `<div class="input-group"><label>CAT${c} Loss%</label><input type="number" step="0.01" id="l_${c}" value="${AEP_LOSS_MAP[c]}"></div>`).join('');
+        document.getElementById('matInputs').innerHTML = MATERIALS.map(m => `<div class="input-group"><label>${m.name}</label><input type="number" step="0.1" id="m_${m.id}" value="${m.threshold}"></div>`).join('');
         document.getElementById('econInputs').innerHTML = `<tr><th>CAT</th><th>Ser/WTG ($)</th><th>Mat/WTG ($)</th><th>RAT/WTG ($)</th><th>KPI/WTG (Days)</th></tr>` + [2,3,4,5].map(c => `
             <tr><td>CAT${c}</td><td><input type="number" id="es_${c}" value="${REPAIR_ECONOMICS[c].serviceWTG}"></td><td><input type="number" id="em_${c}" value="${REPAIR_ECONOMICS[c].materialWTG}"></td><td><input type="number" id="er_${c}" value="${REPAIR_ECONOMICS[c].ratWTG}"></td><td><input type="number" step="0.1" id="ek_${c}" value="${REPAIR_ECONOMICS[c].kpiDaysWTG}"></td></tr>
         `).join('');
@@ -562,7 +647,6 @@
     }
 
     function saveSettings() {
-        Object.keys(SEVERITY_HOURS).forEach(k => SEVERITY_HOURS[k] = parseFloat(document.getElementById('s_'+k).value));
         [1,2,3,4,5].forEach(c => AEP_LOSS_MAP[c] = parseFloat(document.getElementById('l_'+c).value));
         MATERIALS.forEach(m => m.threshold = parseFloat(document.getElementById('m_'+m.id).value));
         [2,3,4,5].forEach(c => REPAIR_ECONOMICS[c] = { 
@@ -585,10 +669,7 @@
             id: Date.now(), 
             name: `Repair at CAT ${defaultTrigger} (${matName})`, 
             trigger: defaultTrigger, 
-            material: defaultMat, 
-            color: newColor, 
-            visible: true,
-            autoName: true
+            material: defaultMat, color: newColor, visible: true, autoName: true
         });
         renderInputs(); runSimulation(true);
     }
